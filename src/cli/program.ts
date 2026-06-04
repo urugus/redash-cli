@@ -29,6 +29,7 @@ export type PromptPassword = (message: string) => Promise<string>;
 export type ProgramDeps = {
   readonly io?: Io;
   readonly promptPassword?: PromptPassword;
+  readonly version?: string;
 };
 
 const printError = (io: Io, error: AppError): void => {
@@ -75,10 +76,11 @@ const promptApiKey = (promptPassword: PromptPassword): ResultAsync<string, AppEr
 export const createProgram = ({
   io = { stdout: process.stdout, stderr: process.stderr },
   promptPassword = (message) => password({ message, mask: "*" }),
+  version = packageJson.version,
 }: ProgramDeps = {}): Command => {
   const program = new Command();
 
-  program.name("redash").description("Small Redash CLI").version(packageJson.version);
+  program.name("redash").description("Small Redash CLI").version(version);
 
   const config = program.command("config").description("Manage local Redash profiles");
 
