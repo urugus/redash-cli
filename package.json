@@ -1,10 +1,10 @@
 {
   "name": "@urugus/redash-cli",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "A small command-line client for Redash.",
   "type": "module",
   "bin": {
-    "redash": "./dist/index.js"
+    "redash": "dist/index.js"
   },
   "files": [
     "dist"

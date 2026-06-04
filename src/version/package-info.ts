@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-const fallbackVersion = "0.1.1";
+const fallbackVersion = "0.1.2";
 
 export const readPackageVersion = async (): Promise<string> => {
   try {

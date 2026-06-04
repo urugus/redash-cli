@@ -125,7 +125,7 @@ Build output is written to `dist/`.
 This package uses npm versions and Git tags as a pair:
 
 ```text
-package.json version 0.1.1 <=> Git tag v0.1.1 <=> npm package @urugus/redash-cli@0.1.1
+package.json version 0.1.2 <=> Git tag v0.1.2 <=> npm package @urugus/redash-cli@0.1.2
 ```
 
 Before publishing, verify the package:
