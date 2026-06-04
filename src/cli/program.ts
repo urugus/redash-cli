@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import { password } from "@inquirer/prompts";
 import { Command } from "commander";
 import { ResultAsync } from "neverthrow";
@@ -14,6 +15,9 @@ import { readApiKey, saveApiKey } from "../keychain/keychain.js";
 import { formatRows, parseOutputFormat } from "../output/format.js";
 import { createRedashClient } from "../redash/client.js";
 import { type QueryRunOptions, validateQueryRunOptions } from "./validation.js";
+
+const require = createRequire(import.meta.url);
+const packageJson = require("../../package.json") as { version: string };
 
 export type Io = {
   readonly stdout: Pick<NodeJS.WriteStream, "write">;
@@ -74,7 +78,7 @@ export const createProgram = ({
 }: ProgramDeps = {}): Command => {
   const program = new Command();
 
-  program.name("redash").description("Small Redash CLI").version("0.1.0");
+  program.name("redash").description("Small Redash CLI").version(packageJson.version);
 
   const config = program.command("config").description("Manage local Redash profiles");
 
