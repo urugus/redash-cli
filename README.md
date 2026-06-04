@@ -110,6 +110,40 @@ pnpm format
 
 Build output is written to `dist/`.
 
+## Release
+
+This package uses npm versions and Git tags as a pair:
+
+```text
+package.json version 0.1.0 <=> Git tag v0.1.0 <=> npm package @urugus/redash-cli@0.1.0
+```
+
+Before publishing, verify the package:
+
+```sh
+pnpm release:check
+```
+
+For a normal release:
+
+```sh
+pnpm release:patch
+npm publish
+git push origin main --tags
+```
+
+Use `release:minor` for compatible feature releases and `release:major` for breaking CLI changes.
+
+For a beta release:
+
+```sh
+pnpm release:beta
+npm publish --tag beta
+git push origin main --tags
+```
+
+The scoped package is configured for public npm publishing through `publishConfig.access`.
+
 ## Notes
 
 - Supported output formats are `json` and `csv`.

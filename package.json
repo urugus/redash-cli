@@ -1,17 +1,37 @@
 {
   "name": "@urugus/redash-cli",
   "version": "0.1.0",
-  "private": true,
+  "description": "A small command-line client for Redash.",
   "type": "module",
   "bin": {
     "redash": "./dist/index.js"
   },
+  "files": [
+    "dist"
+  ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "test": "vitest run",
     "lint": "pnpm exec oxlint .",
     "format": "pnpm exec biome check --write .",
-    "check": "pnpm exec biome check . && pnpm exec oxlint . && pnpm exec vitest run && pnpm exec tsc --noEmit"
+    "check": "pnpm exec biome check . && pnpm exec oxlint . && pnpm exec vitest run && pnpm exec tsc --noEmit",
+    "prepack": "pnpm build",
+    "release:check": "pnpm check && npm pack --dry-run --cache /tmp/redash-cli-npm-cache",
+    "release:patch": "npm version patch",
+    "release:minor": "npm version minor",
+    "release:major": "npm version major",
+    "release:beta": "npm version prerelease --preid beta"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/urugus/redash-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/urugus/redash-cli/issues"
+  },
+  "homepage": "https://github.com/urugus/redash-cli#readme",
+  "publishConfig": {
+    "access": "public"
   },
   "dependencies": {
     "@inquirer/prompts": "^8.0.1",
