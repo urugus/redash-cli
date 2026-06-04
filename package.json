@@ -1,0 +1,34 @@
+{
+  "name": "@urugus/redash-cli",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "bin": {
+    "redash": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "lint": "pnpm exec oxlint .",
+    "format": "pnpm exec biome check --write .",
+    "check": "pnpm exec biome check . && pnpm exec oxlint . && pnpm exec vitest run && pnpm exec tsc --noEmit"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^8.0.1",
+    "commander": "^14.0.2",
+    "neverthrow": "^8.2.0",
+    "zod": "^4.1.13"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.2.0",
+    "@types/node": "^25.0.0",
+    "oxlint": "^1.29.0",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.14"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=10.33.0"
+  },
+  "packageManager": "pnpm@10.33.0"
+}
