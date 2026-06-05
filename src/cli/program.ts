@@ -14,7 +14,17 @@ import type { AppError } from "../errors/app-error.js";
 import { readApiKey, saveApiKey } from "../keychain/keychain.js";
 import { formatRows, parseOutputFormat } from "../output/format.js";
 import { createRedashClient } from "../redash/client.js";
-import { type QueryRunOptions, validateQueryRunOptions } from "./validation.js";
+import {
+  buildPostgresExplainSql,
+  decodePostgresExplainRows,
+  findPostgresDataSource,
+} from "./explain.js";
+import {
+  type QueryExplainOptions,
+  type QueryRunOptions,
+  validateQueryExplainOptions,
+  validateQueryRunOptions,
+} from "./validation.js";
 
 const require = createRequire(import.meta.url);
 const packageJson = require("../../package.json") as { version: string };
@@ -201,6 +211,37 @@ export const createProgram = ({
           ),
         ({ rows, format }) => {
           io.stdout.write(formatRows(rows, format));
+        },
+      );
+    });
+
+  query
+    .command("explain")
+    .requiredOption("--data-source-id <id>", "Data source id")
+    .requiredOption("--sql <sql>", "SQL to explain")
+    .option("--profile <profile>", "Profile name")
+    .description("Run PostgreSQL EXPLAIN through Redash")
+    .action(async (options: QueryExplainOptions) => {
+      await runTask(
+        io,
+        validateQueryExplainOptions(options)
+          .andThen((validOptions) =>
+            buildPostgresExplainSql(validOptions.sql).map((explainSql) => ({
+              ...validOptions,
+              explainSql,
+            })),
+          )
+          .asyncAndThen((validOptions) =>
+            buildClientForProfile(validOptions.profile).andThen(({ client }) =>
+              client
+                .listDataSources()
+                .andThen((sources) => findPostgresDataSource(sources, validOptions.dataSourceId))
+                .andThen(() => client.runQuery(validOptions.dataSourceId, validOptions.explainSql))
+                .andThen((rows) => decodePostgresExplainRows(rows)),
+            ),
+          ),
+        (output) => {
+          io.stdout.write(`${JSON.stringify(output, null, 2)}\n`);
         },
       );
     });
