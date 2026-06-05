@@ -128,17 +128,18 @@ This package uses npm versions and Git tags as a pair:
 package.json version 0.1.2 <=> Git tag v0.1.2 <=> npm package @urugus/redash-cli@0.1.2
 ```
 
-Before publishing, verify the package:
+Before creating a release, verify the package:
 
 ```sh
 pnpm release:check
 ```
 
+Pushing a `vX.Y.Z` tag runs the release workflow and publishes the package to npm automatically. Normal versions publish with the `latest` dist-tag, and prerelease versions publish with the `beta` dist-tag.
+
 For a normal release:
 
 ```sh
 pnpm release:patch
-npm publish
 git push origin main --tags
 ```
 
@@ -148,11 +149,11 @@ For a beta release:
 
 ```sh
 pnpm release:beta
-npm publish --tag beta
 git push origin main --tags
 ```
 
 The scoped package is configured for public npm publishing through `publishConfig.access`.
+The release workflow requires an `NPM_TOKEN` repository secret.
 
 ## Notes
 

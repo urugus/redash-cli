@@ -1,0 +1,78 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    name: Publish
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          run_install: false
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Verify release tag
+        id: release
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          EXPECTED_TAG="v$VERSION"
+
+          if [ "$GITHUB_REF_NAME" != "$EXPECTED_TAG" ]; then
+            echo "Release tag $GITHUB_REF_NAME does not match package.json version $VERSION."
+            echo "Expected tag: $EXPECTED_TAG"
+            exit 1
+          fi
+
+          if [[ "$VERSION" == *-* ]]; then
+            echo "npm_tag=beta" >> "$GITHUB_OUTPUT"
+          else
+            echo "npm_tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check package
+        run: pnpm release:check
+
+      - name: Publish to npm
+        run: |
+          if [ "${{ steps.release.outputs.npm_tag }}" = "beta" ]; then
+            npm publish --tag beta
+          else
+            npm publish
+          fi
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3.0.0
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: ${{ github.ref_name }}
+          generate_release_notes: true
