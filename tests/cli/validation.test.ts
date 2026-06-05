@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { validateQueryRunOptions } from "../../src/cli/validation.js";
+import { validateQueryExplainOptions, validateQueryRunOptions } from "../../src/cli/validation.js";
 
 describe("CLI validation", () => {
   it("accepts valid query run options", () => {
@@ -21,6 +21,28 @@ describe("CLI validation", () => {
     const result = validateQueryRunOptions({
       dataSourceId: "1",
       sql: "   ",
+    });
+
+    expect(result.isErr()).toBe(true);
+  });
+
+  it("accepts valid query explain options", () => {
+    const result = validateQueryExplainOptions({
+      dataSourceId: "1",
+      sql: "select 1",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result.value).toEqual({
+      dataSourceId: 1,
+      sql: "select 1",
+    });
+  });
+
+  it("rejects invalid query explain data source id", () => {
+    const result = validateQueryExplainOptions({
+      dataSourceId: "0",
+      sql: "select 1",
     });
 
     expect(result.isErr()).toBe(true);

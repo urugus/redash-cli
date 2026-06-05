@@ -8,6 +8,12 @@ export type QueryRunOptions = {
   readonly profile?: string;
 };
 
+export type QueryExplainOptions = {
+  readonly dataSourceId: string;
+  readonly sql: string;
+  readonly profile?: string;
+};
+
 export type ValidQueryRunOptions = {
   readonly dataSourceId: number;
   readonly sql: string;
@@ -15,23 +21,49 @@ export type ValidQueryRunOptions = {
   readonly profile?: string;
 };
 
-export const validateQueryRunOptions = (
-  options: QueryRunOptions,
-): Result<ValidQueryRunOptions, AppError> => {
-  const dataSourceId = Number(options.dataSourceId);
+export type ValidQueryExplainOptions = {
+  readonly dataSourceId: number;
+  readonly sql: string;
+  readonly profile?: string;
+};
+
+const validateDataSourceId = (value: string): Result<number, AppError> => {
+  const dataSourceId = Number(value);
 
   if (!Number.isInteger(dataSourceId) || dataSourceId <= 0) {
     return err(appError("validation_error", "Data source id must be a positive integer."));
   }
 
-  if (options.sql.trim().length === 0) {
+  return ok(dataSourceId);
+};
+
+const validateSql = (sql: string): Result<string, AppError> => {
+  if (sql.trim().length === 0) {
     return err(appError("validation_error", "SQL is required."));
   }
 
-  return ok({
-    dataSourceId,
-    sql: options.sql,
-    format: options.format,
-    profile: options.profile,
-  });
+  return ok(sql);
 };
+
+export const validateQueryRunOptions = (
+  options: QueryRunOptions,
+): Result<ValidQueryRunOptions, AppError> =>
+  validateDataSourceId(options.dataSourceId).andThen((dataSourceId) =>
+    validateSql(options.sql).map((sql) => ({
+      dataSourceId,
+      sql,
+      format: options.format,
+      profile: options.profile,
+    })),
+  );
+
+export const validateQueryExplainOptions = (
+  options: QueryExplainOptions,
+): Result<ValidQueryExplainOptions, AppError> =>
+  validateDataSourceId(options.dataSourceId).andThen((dataSourceId) =>
+    validateSql(options.sql).map((sql) => ({
+      dataSourceId,
+      sql,
+      profile: options.profile,
+    })),
+  );

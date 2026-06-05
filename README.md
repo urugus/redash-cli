@@ -99,6 +99,16 @@ Use a non-default profile:
 redash query run --profile staging --data-source-id 1 --sql "select current_date"
 ```
 
+Preview a PostgreSQL query plan without running the query:
+
+```sh
+redash query explain --data-source-id 1 --sql "select * from invoices"
+```
+
+`query explain` currently supports PostgreSQL data sources only. It runs
+`EXPLAIN (FORMAT JSON)` without `ANALYZE`, accepts only single `SELECT` or `WITH`
+queries, and prints a JSON object containing a small summary plus the raw plan.
+
 ## Development
 
 ```sh
@@ -148,4 +158,5 @@ The scoped package is configured for public npm publishing through `publishConfi
 
 - Supported output formats are `json` and `csv`.
 - Query execution uses Redash's `/api/query_results` endpoint and polls asynchronous jobs until completion.
+- Query explain uses PostgreSQL `EXPLAIN (FORMAT JSON)` and does not execute `EXPLAIN ANALYZE`.
 - Redash URLs must start with `http://` or `https://`.
