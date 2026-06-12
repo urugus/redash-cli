@@ -22,8 +22,10 @@ import {
 import {
   type QueryExplainOptions,
   type QueryRunOptions,
+  type UserInviteOptions,
   validateQueryExplainOptions,
   validateQueryRunOptions,
+  validateUserInviteOptions,
 } from "./validation.js";
 
 const require = createRequire(import.meta.url);
@@ -181,6 +183,33 @@ export const createProgram = ({
         buildClientForProfile(options.profile).andThen(({ client }) => client.listDataSources()),
         (sources) => {
           io.stdout.write(`${JSON.stringify(sources, null, 2)}\n`);
+        },
+      );
+    });
+
+  const users = program.command("users").description("Redash user commands");
+
+  users
+    .command("invite")
+    .requiredOption("--name <name>", "User display name")
+    .requiredOption("--email <email>", "User email address")
+    .option("--profile <profile>", "Profile name")
+    .option("--no-send-email", "Create a pending invitation without sending an invitation email")
+    .description("Invite a Redash user")
+    .action(async (options: UserInviteOptions) => {
+      await runTask(
+        io,
+        validateUserInviteOptions(options).asyncAndThen((validOptions) =>
+          buildClientForProfile(validOptions.profile).andThen(({ client }) =>
+            client.inviteUser({
+              name: validOptions.name,
+              email: validOptions.email,
+              sendEmail: validOptions.sendEmail,
+            }),
+          ),
+        ),
+        (user) => {
+          io.stdout.write(`${JSON.stringify(user, null, 2)}\n`);
         },
       );
     });

@@ -21,6 +21,24 @@ export type DataSource = {
   readonly type: string;
 };
 
+export type InviteUserInput = {
+  readonly name: string;
+  readonly email: string;
+  readonly sendEmail: boolean;
+};
+
+const invitedUserSchema = z
+  .object({
+    id: z.number(),
+    name: z.string(),
+    email: z.string(),
+    is_invitation_pending: z.boolean().optional(),
+    invite_link: z.string().optional(),
+  })
+  .passthrough();
+
+export type InvitedUser = z.infer<typeof invitedUserSchema>;
+
 const rowSchema = z.record(z.string(), z.unknown());
 const rowsSchema = z.array(rowSchema);
 
@@ -110,6 +128,15 @@ const requestJson = (
     (cause) => appError("redash_http_error", `Failed to request Redash: ${path}`, cause),
   ).andThen((response) => {
     if (!response.ok) {
+      if (response.status === 403) {
+        return err(
+          appError(
+            "redash_http_error",
+            `Redash HTTP 403: ${path}. The API key may not have permission for this operation.`,
+          ),
+        );
+      }
+
       return err(appError("redash_http_error", `Redash HTTP ${response.status}: ${path}`));
     }
 
@@ -161,6 +188,7 @@ const pollJob = (
 export type RedashClient = {
   readonly testAuth: () => ResultAsync<void, AppError>;
   readonly listDataSources: () => ResultAsync<readonly DataSource[], AppError>;
+  readonly inviteUser: (input: InviteUserInput) => ResultAsync<InvitedUser, AppError>;
   readonly runQuery: (dataSourceId: number, sql: string) => ResultAsync<readonly Row[], AppError>;
 };
 
@@ -191,6 +219,32 @@ export const createRedashClient = ({
 
       return ok(parsed.data);
     });
+
+  const inviteUser = (input: InviteUserInput): ResultAsync<InvitedUser, AppError> => {
+    const path = input.sendEmail ? "/api/users" : "/api/users?no_invite";
+
+    return requestJson(baseUrl, apiKey, fetchImpl, path, {
+      method: "POST",
+      body: JSON.stringify({
+        name: input.name,
+        email: input.email,
+      }),
+    }).andThen((json) => {
+      const parsed = invitedUserSchema.safeParse(json);
+
+      if (!parsed.success) {
+        return err(
+          appError(
+            "redash_invalid_response",
+            "Redash user invite response is invalid.",
+            parsed.error,
+          ),
+        );
+      }
+
+      return ok(parsed.data);
+    });
+  };
 
   const runQuery = (dataSourceId: number, sql: string): ResultAsync<readonly Row[], AppError> =>
     requestJson(baseUrl, apiKey, fetchImpl, "/api/query_results", {
@@ -235,6 +289,7 @@ export const createRedashClient = ({
   return {
     testAuth,
     listDataSources,
+    inviteUser,
     runQuery,
   };
 };
