@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { validateQueryExplainOptions, validateQueryRunOptions } from "../../src/cli/validation.js";
+import {
+  validateQueryExplainOptions,
+  validateQueryRunOptions,
+  validateUserInviteOptions,
+} from "../../src/cli/validation.js";
 
 describe("CLI validation", () => {
   it("accepts valid query run options", () => {
@@ -43,6 +47,30 @@ describe("CLI validation", () => {
     const result = validateQueryExplainOptions({
       dataSourceId: "0",
       sql: "select 1",
+    });
+
+    expect(result.isErr()).toBe(true);
+  });
+
+  it("accepts valid user invite options", () => {
+    const result = validateUserInviteOptions({
+      name: " Taro Yamada ",
+      email: " taro@example.com ",
+      sendEmail: false,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result.value).toEqual({
+      name: "Taro Yamada",
+      email: "taro@example.com",
+      sendEmail: false,
+    });
+  });
+
+  it("rejects invalid user invite email", () => {
+    const result = validateUserInviteOptions({
+      name: "Taro Yamada",
+      email: "taro.example.com",
     });
 
     expect(result.isErr()).toBe(true);

@@ -14,6 +14,13 @@ export type QueryExplainOptions = {
   readonly profile?: string;
 };
 
+export type UserInviteOptions = {
+  readonly name: string;
+  readonly email: string;
+  readonly sendEmail?: boolean;
+  readonly profile?: string;
+};
+
 export type ValidQueryRunOptions = {
   readonly dataSourceId: number;
   readonly sql: string;
@@ -24,6 +31,13 @@ export type ValidQueryRunOptions = {
 export type ValidQueryExplainOptions = {
   readonly dataSourceId: number;
   readonly sql: string;
+  readonly profile?: string;
+};
+
+export type ValidUserInviteOptions = {
+  readonly name: string;
+  readonly email: string;
+  readonly sendEmail: boolean;
   readonly profile?: string;
 };
 
@@ -45,6 +59,25 @@ const validateSql = (sql: string): Result<string, AppError> => {
   return ok(sql);
 };
 
+const validateRequiredText = (value: string, field: string): Result<string, AppError> => {
+  const trimmed = value.trim();
+
+  if (trimmed.length === 0) {
+    return err(appError("validation_error", `${field} is required.`));
+  }
+
+  return ok(trimmed);
+};
+
+const validateEmail = (email: string): Result<string, AppError> =>
+  validateRequiredText(email, "Email").andThen((trimmed) => {
+    if (!trimmed.includes("@")) {
+      return err(appError("validation_error", "Email must include @."));
+    }
+
+    return ok(trimmed);
+  });
+
 export const validateQueryRunOptions = (
   options: QueryRunOptions,
 ): Result<ValidQueryRunOptions, AppError> =>
@@ -64,6 +97,18 @@ export const validateQueryExplainOptions = (
     validateSql(options.sql).map((sql) => ({
       dataSourceId,
       sql,
+      profile: options.profile,
+    })),
+  );
+
+export const validateUserInviteOptions = (
+  options: UserInviteOptions,
+): Result<ValidUserInviteOptions, AppError> =>
+  validateRequiredText(options.name, "Name").andThen((name) =>
+    validateEmail(options.email).map((email) => ({
+      name,
+      email,
+      sendEmail: options.sendEmail !== false,
       profile: options.profile,
     })),
   );

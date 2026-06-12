@@ -54,6 +54,15 @@ const okAsync = async <T>(value: T) => {
   return ResultAsync.fromSafePromise(Promise.resolve(value));
 };
 
+const errAsync = async () => {
+  const { ResultAsync } = await import("neverthrow");
+
+  return ResultAsync.fromPromise(Promise.reject(new Error("forbidden")), () => ({
+    code: "redash_http_error" as const,
+    message: "Redash HTTP 403: /api/users. The API key may not have permission for this operation.",
+  }));
+};
+
 const createTestIo = (): {
   readonly io: Io;
   readonly stdout: () => string;
@@ -82,7 +91,7 @@ const createTestIo = (): {
   };
 };
 
-describe("CLI program query explain", () => {
+describe("CLI program users", () => {
   beforeEach(() => {
     process.exitCode = undefined;
     vi.clearAllMocks();
@@ -93,89 +102,94 @@ describe("CLI program query explain", () => {
     process.exitCode = undefined;
   });
 
-  it("runs PostgreSQL EXPLAIN and prints summary plus plan JSON", async () => {
+  it("invites a user and prints the Redash response", async () => {
     const { createProgram } = await import("../../src/cli/program.js");
     const { io, stdout, stderr } = createTestIo();
-    const plan = [
-      {
-        Plan: {
-          "Node Type": "Result",
-          "Plan Rows": 1,
-          "Total Cost": 0.01,
-        },
-      },
-    ];
 
-    redashMocks.client.listDataSources.mockReturnValue(
-      await okAsync([{ id: 1, name: "main", type: "pg" }]),
+    redashMocks.client.inviteUser.mockReturnValue(
+      await okAsync({
+        id: 10,
+        name: "Taro Yamada",
+        email: "taro@example.com",
+        is_invitation_pending: true,
+      }),
     );
-    redashMocks.client.runQuery.mockReturnValue(await okAsync([{ "QUERY PLAN": plan }]));
 
     await createProgram({ io }).parseAsync([
       "node",
       "redash",
-      "query",
-      "explain",
-      "--data-source-id",
-      "1",
-      "--sql",
-      "select 1;",
+      "users",
+      "invite",
+      "--name",
+      "Taro Yamada",
+      "--email",
+      "taro@example.com",
     ]);
 
     expect(stderr()).toBe("");
-    expect(redashMocks.client.runQuery).toHaveBeenCalledWith(1, "EXPLAIN (FORMAT JSON)\nselect 1");
+    expect(redashMocks.client.inviteUser).toHaveBeenCalledWith({
+      name: "Taro Yamada",
+      email: "taro@example.com",
+      sendEmail: true,
+    });
     expect(JSON.parse(stdout())).toEqual({
-      summary: {
-        nodeType: "Result",
-        planRows: 1,
-        totalCost: 0.01,
-      },
-      plan,
+      id: 10,
+      name: "Taro Yamada",
+      email: "taro@example.com",
+      is_invitation_pending: true,
     });
   });
 
-  it("rejects non-PostgreSQL data sources without running the query", async () => {
+  it("can create an invite without sending email", async () => {
     const { createProgram } = await import("../../src/cli/program.js");
-    const { io, stderr } = createTestIo();
+    const { io } = createTestIo();
 
-    redashMocks.client.listDataSources.mockReturnValue(
-      await okAsync([{ id: 1, name: "warehouse", type: "bigquery" }]),
+    redashMocks.client.inviteUser.mockReturnValue(
+      await okAsync({
+        id: 10,
+        name: "Taro Yamada",
+        email: "taro@example.com",
+        invite_link: "https://redash.example.com/invite/token",
+      }),
     );
 
     await createProgram({ io }).parseAsync([
       "node",
       "redash",
-      "query",
-      "explain",
-      "--data-source-id",
-      "1",
-      "--sql",
-      "select 1",
+      "users",
+      "invite",
+      "--name",
+      "Taro Yamada",
+      "--email",
+      "taro@example.com",
+      "--no-send-email",
     ]);
 
-    expect(redashMocks.client.runQuery).not.toHaveBeenCalled();
-    expect(process.exitCode).toBe(1);
-    expect(stderr()).toContain("This command currently supports PostgreSQL data sources only.");
+    expect(redashMocks.client.inviteUser).toHaveBeenCalledWith({
+      name: "Taro Yamada",
+      email: "taro@example.com",
+      sendEmail: false,
+    });
   });
 
-  it("rejects invalid SQL before fetching data sources", async () => {
+  it("prints permission errors from Redash", async () => {
     const { createProgram } = await import("../../src/cli/program.js");
     const { io, stderr } = createTestIo();
+
+    redashMocks.client.inviteUser.mockReturnValue(await errAsync());
 
     await createProgram({ io }).parseAsync([
       "node",
       "redash",
-      "query",
-      "explain",
-      "--data-source-id",
-      "1",
-      "--sql",
-      "select 1; select 2",
+      "users",
+      "invite",
+      "--name",
+      "Taro Yamada",
+      "--email",
+      "taro@example.com",
     ]);
 
-    expect(redashMocks.client.listDataSources).not.toHaveBeenCalled();
-    expect(redashMocks.client.runQuery).not.toHaveBeenCalled();
     expect(process.exitCode).toBe(1);
-    expect(stderr()).toContain("EXPLAIN only supports a single SQL statement.");
+    expect(stderr()).toContain("may not have permission");
   });
 });

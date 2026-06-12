@@ -81,6 +81,18 @@ List Redash data sources:
 redash data-sources list
 ```
 
+Invite a Redash user:
+
+```sh
+redash users invite --name "Taro Yamada" --email taro@example.com
+```
+
+Create a pending invitation without sending email:
+
+```sh
+redash users invite --name "Taro Yamada" --email taro@example.com --no-send-email
+```
+
 Run SQL and print JSON:
 
 ```sh
@@ -158,6 +170,7 @@ The release workflow requires an `NPM_TOKEN` repository secret.
 ## Notes
 
 - Supported output formats are `json` and `csv`.
+- User invitation requires an admin API key.
 - Query execution uses Redash's `/api/query_results` endpoint and polls asynchronous jobs until completion.
 - Query explain uses PostgreSQL `EXPLAIN (FORMAT JSON)` and does not execute `EXPLAIN ANALYZE`.
 - Redash URLs must start with `http://` or `https://`.

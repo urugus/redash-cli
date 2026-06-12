@@ -40,6 +40,94 @@ describe("Redash client", () => {
     );
   });
 
+  it("invites a user and sends an email by default", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(
+      jsonResponse({
+        id: 10,
+        name: "Taro Yamada",
+        email: "taro@example.com",
+        is_invitation_pending: true,
+      }),
+    );
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+    });
+
+    const result = await client.inviteUser({
+      name: "Taro Yamada",
+      email: "taro@example.com",
+      sendEmail: true,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result.value).toEqual({
+      id: 10,
+      name: "Taro Yamada",
+      email: "taro@example.com",
+      is_invitation_pending: true,
+    });
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://redash.example.com/api/users",
+      expect.objectContaining({
+        method: "POST",
+        body: JSON.stringify({
+          name: "Taro Yamada",
+          email: "taro@example.com",
+        }),
+      }),
+    );
+  });
+
+  it("invites a user without sending an email", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(
+      jsonResponse({
+        id: 10,
+        name: "Taro Yamada",
+        email: "taro@example.com",
+        invite_link: "https://redash.example.com/invite/token",
+      }),
+    );
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+    });
+
+    const result = await client.inviteUser({
+      name: "Taro Yamada",
+      email: "taro@example.com",
+      sendEmail: false,
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://redash.example.com/api/users?no_invite",
+      expect.objectContaining({
+        method: "POST",
+      }),
+    );
+  });
+
+  it("returns a permission error when user invitation is forbidden", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(jsonResponse({ message: "no" }, 403));
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+    });
+
+    const result = await client.inviteUser({
+      name: "Taro Yamada",
+      email: "taro@example.com",
+      sendEmail: true,
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result.error.message).toContain("may not have permission");
+  });
+
   it("returns immediate query rows", async () => {
     const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(
       jsonResponse({
