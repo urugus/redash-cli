@@ -118,6 +118,17 @@ const jobResponseSchema = z.object({
 });
 
 const maxDashboardPageSize = 250;
+const redactedValue = "[REDACTED]";
+const sensitiveFieldNames = new Set([
+  "accesstoken",
+  "apikey",
+  "clientsecret",
+  "password",
+  "privatekey",
+  "refreshtoken",
+  "secret",
+  "token",
+]);
 const defaultSleep: Sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
 const ensure = <T>(
@@ -136,6 +147,32 @@ const parseSchema = <T>(
   return parsed.success
     ? ok(parsed.data)
     : err(appError("redash_invalid_response", message, parsed.error));
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === "object" && value !== null && !Array.isArray(value);
+
+const normalizeFieldName = (name: string): string =>
+  name.replace(/[^a-zA-Z0-9]/g, "").toLowerCase();
+
+const isSensitiveFieldName = (name: string): boolean =>
+  sensitiveFieldNames.has(normalizeFieldName(name));
+
+const redactSensitiveFields = (value: unknown): unknown => {
+  if (Array.isArray(value)) {
+    return value.map((item) => redactSensitiveFields(item));
+  }
+
+  if (!isRecord(value)) {
+    return value;
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).map(([key, nestedValue]) => [
+      key,
+      isSensitiveFieldName(key) ? redactedValue : redactSensitiveFields(nestedValue),
+    ]),
+  );
 };
 
 const decodeJson = (value: unknown, context: string): Result<unknown, AppError> => {
@@ -168,7 +205,9 @@ const decodeDashboardList = (value: unknown): Result<DashboardList, AppError> =>
   decodeDashboardEnvelope(value).orElse(() => decodeDashboardArray(value));
 
 const decodeDashboard = (value: unknown): Result<Dashboard, AppError> =>
-  parseSchema(dashboardSchema, value, "Redash dashboard response is invalid.");
+  parseSchema(dashboardSchema, value, "Redash dashboard response is invalid.").map(
+    (dashboard) => redactSensitiveFields(dashboard) as Dashboard,
+  );
 
 const decodeInvitedUser = (value: unknown): Result<InvitedUser, AppError> =>
   parseSchema(invitedUserSchema, value, "Redash user invite response is invalid.");
