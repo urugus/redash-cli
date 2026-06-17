@@ -1,4 +1,4 @@
-import { err, ok, type Result } from "neverthrow";
+import { err, ok, Result, type Result as ResultType } from "neverthrow";
 import { type AppError, appError } from "../errors/app-error.js";
 import { nonEmptyTrimmed } from "../lib/result.js";
 
@@ -162,17 +162,17 @@ export const validateUserInviteOptions = (
 
 export const validateDashboardListOptions = (
   options: DashboardListOptions,
-): Result<ValidDashboardListOptions, AppError> =>
-  validatePositiveInteger(options.page ?? "1", "Page").andThen((page) =>
-    validateDashboardPageSize(options.pageSize ?? "20").andThen((pageSize) =>
-      validateRequiredText(options.order ?? "-created_at", "Order").map((order) => ({
-        page,
-        pageSize,
-        order,
-        profile: options.profile,
-      })),
-    ),
-  );
+): ResultType<ValidDashboardListOptions, AppError> =>
+  Result.combine([
+    validatePositiveInteger(options.page ?? "1", "Page"),
+    validateDashboardPageSize(options.pageSize ?? "20"),
+    validateRequiredText(options.order ?? "-created_at", "Order"),
+  ]).map(([page, pageSize, order]) => ({
+    page,
+    pageSize,
+    order,
+    profile: options.profile,
+  }));
 
 export const validateDashboardGetOptions = (
   slug: string,
