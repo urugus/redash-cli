@@ -1,6 +1,6 @@
 {
   "name": "redash-cli",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Codex workflows for developing, setting up, and using redash-cli.",
   "author": {
     "name": "urugus"
