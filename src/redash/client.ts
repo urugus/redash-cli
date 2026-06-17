@@ -146,21 +146,15 @@ const decodeJson = (value: unknown, context: string): Result<unknown, AppError> 
   return ok(value);
 };
 
-const decodeRows = (value: unknown, context: string): Result<readonly Row[], AppError> => {
-  const parsed = queryResultEnvelopeSchema.safeParse(value);
+const decodeRows = (value: unknown, context: string): Result<readonly Row[], AppError> =>
+  parseSchema(
+    queryResultEnvelopeSchema,
+    value,
+    `Redash rows response is invalid for ${context}.`,
+  ).map((envelope) => envelope.query_result.data.rows);
 
-  if (!parsed.success) {
-    return err(
-      appError(
-        "redash_invalid_response",
-        `Redash rows response is invalid for ${context}.`,
-        parsed.error,
-      ),
-    );
-  }
-
-  return ok(parsed.data.query_result.data.rows);
-};
+const decodeDataSources = (value: unknown): Result<readonly DataSource[], AppError> =>
+  parseSchema(dataSourcesSchema, value, "Redash data sources response is invalid.");
 
 const decodeDashboardEnvelope = (value: unknown): Result<DashboardList, AppError> =>
   parseSchema(dashboardListEnvelopeSchema, value, "Redash dashboards response is invalid.");
@@ -175,6 +169,34 @@ const decodeDashboardList = (value: unknown): Result<DashboardList, AppError> =>
 
 const decodeDashboard = (value: unknown): Result<Dashboard, AppError> =>
   parseSchema(dashboardSchema, value, "Redash dashboard response is invalid.");
+
+const decodeInvitedUser = (value: unknown): Result<InvitedUser, AppError> =>
+  parseSchema(invitedUserSchema, value, "Redash user invite response is invalid.");
+
+const decodeQueryRunResponse = (
+  value: unknown,
+): Result<z.infer<typeof queryRunResponseSchema>, AppError> =>
+  parseSchema(queryRunResponseSchema, value, "Redash query run response is invalid.");
+
+type JobPollOutcome =
+  | { readonly kind: "complete"; readonly queryResultId: number }
+  | { readonly kind: "pending" };
+
+const decodeJobOutcome = (value: unknown): Result<JobPollOutcome, AppError> =>
+  parseSchema(jobResponseSchema, value, "Redash job response is invalid.").andThen(({ job }) => {
+    if (job.status === 3 && job.query_result_id != null) {
+      return ok<JobPollOutcome, AppError>({
+        kind: "complete",
+        queryResultId: job.query_result_id,
+      });
+    }
+
+    if (job.status === 4) {
+      return err(appError("redash_job_failed", job.error ?? "Redash query job failed."));
+    }
+
+    return ok<JobPollOutcome, AppError>({ kind: "pending" });
+  });
 
 const validateDashboardPositiveInteger = (value: number, field: string): Result<number, AppError> =>
   ensure(
@@ -279,33 +301,21 @@ const pollJob = (
   maxAttempts: number,
 ): ResultAsync<number, AppError> => {
   const poll = (attempt: number): ResultAsync<number, AppError> =>
-    requestJson(baseUrl, apiKey, fetchImpl, `/api/jobs/${jobId}`).andThen((json) => {
-      const parsed = jobResponseSchema.safeParse(json);
+    requestJson(baseUrl, apiKey, fetchImpl, `/api/jobs/${jobId}`)
+      .andThen((json) => decodeJobOutcome(json))
+      .andThen((outcome) => {
+        if (outcome.kind === "complete") {
+          return ok(outcome.queryResultId);
+        }
 
-      if (!parsed.success) {
-        return err(
-          appError("redash_invalid_response", "Redash job response is invalid.", parsed.error),
-        );
-      }
+        if (attempt >= maxAttempts) {
+          return err(appError("redash_job_timeout", `Redash query job timed out: ${jobId}`));
+        }
 
-      const { job } = parsed.data;
-
-      if (job.status === 3 && job.query_result_id != null) {
-        return ok(job.query_result_id);
-      }
-
-      if (job.status === 4) {
-        return err(appError("redash_job_failed", job.error ?? "Redash query job failed."));
-      }
-
-      if (attempt >= maxAttempts) {
-        return err(appError("redash_job_timeout", `Redash query job timed out: ${jobId}`));
-      }
-
-      return ResultAsync.fromPromise(sleep(intervalMs), (cause) =>
-        appError("redash_job_timeout", "Redash query job polling sleep failed.", cause),
-      ).andThen(() => poll(attempt + 1));
-    });
+        return ResultAsync.fromPromise(sleep(intervalMs), (cause) =>
+          appError("redash_job_timeout", "Redash query job polling sleep failed.", cause),
+        ).andThen(() => poll(attempt + 1));
+      });
 
   return poll(1);
 };
@@ -331,21 +341,9 @@ export const createRedashClient = ({
     requestJson(baseUrl, apiKey, fetchImpl, "/api/session").map(() => undefined);
 
   const listDataSources = (): ResultAsync<readonly DataSource[], AppError> =>
-    requestJson(baseUrl, apiKey, fetchImpl, "/api/data_sources").andThen((json) => {
-      const parsed = dataSourcesSchema.safeParse(json);
-
-      if (!parsed.success) {
-        return err(
-          appError(
-            "redash_invalid_response",
-            "Redash data sources response is invalid.",
-            parsed.error,
-          ),
-        );
-      }
-
-      return ok(parsed.data);
-    });
+    requestJson(baseUrl, apiKey, fetchImpl, "/api/data_sources").andThen((json) =>
+      decodeDataSources(json),
+    );
 
   const listDashboards = (input: DashboardListInput): ResultAsync<DashboardList, AppError> =>
     buildDashboardListPath(input)
@@ -366,21 +364,7 @@ export const createRedashClient = ({
         name: input.name,
         email: input.email,
       }),
-    }).andThen((json) => {
-      const parsed = invitedUserSchema.safeParse(json);
-
-      if (!parsed.success) {
-        return err(
-          appError(
-            "redash_invalid_response",
-            "Redash user invite response is invalid.",
-            parsed.error,
-          ),
-        );
-      }
-
-      return ok(parsed.data);
-    });
+    }).andThen((json) => decodeInvitedUser(json));
   };
 
   const runQuery = (dataSourceId: number, sql: string): ResultAsync<readonly Row[], AppError> =>
@@ -391,37 +375,27 @@ export const createRedashClient = ({
         query: sql,
         max_age: 0,
       }),
-    }).andThen((json) => {
-      const parsed = queryRunResponseSchema.safeParse(json);
+    })
+      .andThen((json) => decodeQueryRunResponse(json))
+      .andThen((response) => {
+        if ("query_result" in response) {
+          return decodeRows(response, "query run");
+        }
 
-      if (!parsed.success) {
-        return err(
-          appError(
-            "redash_invalid_response",
-            "Redash query run response is invalid.",
-            parsed.error,
+        return pollJob(
+          baseUrl,
+          apiKey,
+          fetchImpl,
+          sleep,
+          response.job.id,
+          jobPollIntervalMs,
+          jobPollMaxAttempts,
+        ).andThen((queryResultId) =>
+          requestJson(baseUrl, apiKey, fetchImpl, `/api/query_results/${queryResultId}`).andThen(
+            (resultJson) => decodeRows(resultJson, "query result"),
           ),
         );
-      }
-
-      if ("query_result" in parsed.data) {
-        return decodeRows(parsed.data, "query run");
-      }
-
-      return pollJob(
-        baseUrl,
-        apiKey,
-        fetchImpl,
-        sleep,
-        parsed.data.job.id,
-        jobPollIntervalMs,
-        jobPollMaxAttempts,
-      ).andThen((queryResultId) =>
-        requestJson(baseUrl, apiKey, fetchImpl, `/api/query_results/${queryResultId}`).andThen(
-          (resultJson) => decodeRows(resultJson, "query result"),
-        ),
-      );
-    });
+      });
 
   return {
     testAuth,
