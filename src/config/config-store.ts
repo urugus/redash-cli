@@ -18,9 +18,7 @@ export const readConfigFile = (path = defaultConfigPath()): ResultAsync<CliConfi
       throw error;
     }),
     (cause) => appError("config_invalid", `Failed to read config: ${path}`, cause),
-  ).andThen((text) =>
-    ResultAsync.fromSafePromise(Promise.resolve(parseConfigText(text))).andThen((result) => result),
-  );
+  ).andThen((text) => parseConfigText(text));
 
 export const writeConfigFile = (
   config: CliConfig,
