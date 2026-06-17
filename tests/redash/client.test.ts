@@ -217,7 +217,18 @@ describe("Redash client", () => {
         id: 10,
         name: "Sales Overview",
         slug: "sales overview",
-        widgets: [],
+        widgets: [
+          {
+            visualization: {
+              query: {
+                id: 20,
+                api_key: "query-secret",
+                public_url: "https://redash.example.com/public/dashboards/query-token",
+              },
+            },
+            token: "widget-token",
+          },
+        ],
       }),
     );
     const client = createRedashClient({
@@ -233,7 +244,18 @@ describe("Redash client", () => {
       id: 10,
       name: "Sales Overview",
       slug: "sales overview",
-      widgets: [],
+      widgets: [
+        {
+          visualization: {
+            query: {
+              id: 20,
+              api_key: "[REDACTED]",
+              public_url: "[REDACTED]",
+            },
+          },
+          token: "[REDACTED]",
+        },
+      ],
     });
     expect(fetchImpl).toHaveBeenCalledWith(
       "https://redash.example.com/api/dashboards/sales%20overview",
