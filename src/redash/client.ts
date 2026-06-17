@@ -125,6 +125,7 @@ const sensitiveFieldNames = new Set([
   "clientsecret",
   "password",
   "privatekey",
+  "publicurl",
   "refreshtoken",
   "secret",
   "token",
@@ -158,9 +159,9 @@ const normalizeFieldName = (name: string): string =>
 const isSensitiveFieldName = (name: string): boolean =>
   sensitiveFieldNames.has(normalizeFieldName(name));
 
-const redactSensitiveFields = (value: unknown): unknown => {
+const redactSensitiveFields = <T>(value: T): T => {
   if (Array.isArray(value)) {
-    return value.map((item) => redactSensitiveFields(item));
+    return value.map((item) => redactSensitiveFields(item)) as T;
   }
 
   if (!isRecord(value)) {
@@ -172,7 +173,7 @@ const redactSensitiveFields = (value: unknown): unknown => {
       key,
       isSensitiveFieldName(key) ? redactedValue : redactSensitiveFields(nestedValue),
     ]),
-  );
+  ) as T;
 };
 
 const decodeJson = (value: unknown, context: string): Result<unknown, AppError> => {
@@ -205,8 +206,8 @@ const decodeDashboardList = (value: unknown): Result<DashboardList, AppError> =>
   decodeDashboardEnvelope(value).orElse(() => decodeDashboardArray(value));
 
 const decodeDashboard = (value: unknown): Result<Dashboard, AppError> =>
-  parseSchema(dashboardSchema, value, "Redash dashboard response is invalid.").map(
-    (dashboard) => redactSensitiveFields(dashboard) as Dashboard,
+  parseSchema(dashboardSchema, value, "Redash dashboard response is invalid.").map((dashboard) =>
+    redactSensitiveFields(dashboard),
   );
 
 const decodeInvitedUser = (value: unknown): Result<InvitedUser, AppError> =>

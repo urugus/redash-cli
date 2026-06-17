@@ -223,6 +223,7 @@ describe("Redash client", () => {
               query: {
                 id: 20,
                 api_key: "query-secret",
+                public_url: "https://redash.example.com/public/dashboards/query-token",
               },
             },
             token: "widget-token",
@@ -249,6 +250,7 @@ describe("Redash client", () => {
             query: {
               id: 20,
               api_key: "[REDACTED]",
+              public_url: "[REDACTED]",
             },
           },
           token: "[REDACTED]",
