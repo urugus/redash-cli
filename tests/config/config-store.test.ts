@@ -10,7 +10,7 @@ import {
 
 describe("config store", () => {
   it("uses the redash-cli config path under the home directory", () => {
-    expect(defaultConfigPath()).toMatch(/redash-cli\/config\.json$/);
+    expect(defaultConfigPath()).toMatch(/redash-cli[\\/]config\.json$/);
   });
 
   it("returns an empty config when the config file does not exist", async () => {

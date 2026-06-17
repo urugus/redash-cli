@@ -22,7 +22,7 @@ const createIo = () => {
 
 describe("version notice", () => {
   it("uses the redash-cli state path under the home directory", () => {
-    expect(defaultVersionStatePath()).toMatch(/redash-cli\/state\.json$/);
+    expect(defaultVersionStatePath()).toMatch(/redash-cli[\\/]state\.json$/);
   });
 
   it("stores the current version silently on first startup", async () => {
