@@ -1,4 +1,4 @@
-import { err, ok, type Result, ResultAsync } from "neverthrow";
+import { err, ok, Result, ResultAsync } from "neverthrow";
 import { z } from "zod";
 import { type AppError, appError } from "../errors/app-error.js";
 import type { Row } from "../output/format.js";
@@ -19,6 +19,12 @@ export type DataSource = {
   readonly id: number;
   readonly name: string;
   readonly type: string;
+};
+
+export type DashboardListInput = {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly order: string;
 };
 
 export type InviteUserInput = {
@@ -50,6 +56,41 @@ const dataSourceSchema = z.object({
 
 const dataSourcesSchema = z.array(dataSourceSchema);
 
+const dashboardSummarySchema = z
+  .object({
+    id: z.number(),
+    name: z.string(),
+    slug: z.string(),
+    is_archived: z.boolean().optional(),
+    is_draft: z.boolean().optional(),
+    updated_at: z.string().optional(),
+    created_at: z.string().optional(),
+  })
+  .passthrough();
+
+export type DashboardSummary = z.infer<typeof dashboardSummarySchema>;
+
+const dashboardSchema = dashboardSummarySchema.extend({
+  widgets: z.array(z.unknown()).optional(),
+  visualizations: z.array(z.unknown()).optional(),
+  tags: z.array(z.string()).optional(),
+  user: z.unknown().optional(),
+});
+
+export type Dashboard = z.infer<typeof dashboardSchema>;
+
+const dashboardArraySchema = z.array(dashboardSummarySchema);
+const dashboardListEnvelopeSchema = z
+  .object({
+    count: z.number().optional(),
+    page: z.number().optional(),
+    page_size: z.number().optional(),
+    results: dashboardArraySchema,
+  })
+  .passthrough();
+
+export type DashboardList = z.infer<typeof dashboardListEnvelopeSchema>;
+
 const queryResultEnvelopeSchema = z.object({
   query_result: z.object({
     data: z.object({
@@ -76,7 +117,26 @@ const jobResponseSchema = z.object({
   job: jobSchema,
 });
 
+const maxDashboardPageSize = 250;
 const defaultSleep: Sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+const ensure = <T>(
+  value: T,
+  predicate: (value: T) => boolean,
+  error: AppError,
+): Result<T, AppError> => (predicate(value) ? ok(value) : err(error));
+
+const parseSchema = <T>(
+  schema: z.ZodType<T>,
+  value: unknown,
+  message: string,
+): Result<T, AppError> => {
+  const parsed = schema.safeParse(value);
+
+  return parsed.success
+    ? ok(parsed.data)
+    : err(appError("redash_invalid_response", message, parsed.error));
+};
 
 const decodeJson = (value: unknown, context: string): Result<unknown, AppError> => {
   if (value == null) {
@@ -101,6 +161,71 @@ const decodeRows = (value: unknown, context: string): Result<readonly Row[], App
 
   return ok(parsed.data.query_result.data.rows);
 };
+
+const decodeDashboardEnvelope = (value: unknown): Result<DashboardList, AppError> =>
+  parseSchema(dashboardListEnvelopeSchema, value, "Redash dashboards response is invalid.");
+
+const decodeDashboardArray = (value: unknown): Result<DashboardList, AppError> =>
+  parseSchema(dashboardArraySchema, value, "Redash dashboards response is invalid.").map(
+    (results) => ({ results }),
+  );
+
+const decodeDashboardList = (value: unknown): Result<DashboardList, AppError> =>
+  decodeDashboardEnvelope(value).orElse(() => decodeDashboardArray(value));
+
+const decodeDashboard = (value: unknown): Result<Dashboard, AppError> =>
+  parseSchema(dashboardSchema, value, "Redash dashboard response is invalid.");
+
+const validateDashboardPositiveInteger = (value: number, field: string): Result<number, AppError> =>
+  ensure(
+    value,
+    (current) => Number.isSafeInteger(current) && current >= 1,
+    appError("validation_error", `${field} must be a positive integer.`),
+  );
+
+const validateDashboardPageSize = (pageSize: number): Result<number, AppError> =>
+  ensure(
+    pageSize,
+    (current) => current <= maxDashboardPageSize,
+    appError(
+      "validation_error",
+      `Page size must be less than or equal to ${maxDashboardPageSize}.`,
+    ),
+  );
+
+const validateDashboardRequiredText = (value: string, field: string): Result<string, AppError> =>
+  ok<string, AppError>(value.trim()).andThen((trimmed) =>
+    ensure(
+      trimmed,
+      (current) => current.length > 0,
+      appError("validation_error", `${field} is required.`),
+    ),
+  );
+
+const buildDashboardListQuery = ([page, pageSize, order]: [
+  number,
+  number,
+  string,
+]): URLSearchParams =>
+  new URLSearchParams({
+    page: String(page),
+    page_size: String(pageSize),
+    order,
+  });
+
+const buildDashboardListPath = (input: DashboardListInput): Result<string, AppError> =>
+  Result.combine([
+    validateDashboardPositiveInteger(input.page, "Page"),
+    validateDashboardPositiveInteger(input.pageSize, "Page size").andThen(
+      validateDashboardPageSize,
+    ),
+    validateDashboardRequiredText(input.order, "Order"),
+  ]).map((values) => `/api/dashboards?${buildDashboardListQuery(values)}`);
+
+const buildDashboardPath = (slug: string): Result<string, AppError> =>
+  validateDashboardRequiredText(slug, "Dashboard slug").map(
+    (trimmed) => `/api/dashboards/${encodeURIComponent(trimmed)}`,
+  );
 
 const parseJsonResponse = (response: Response, context: string): ResultAsync<unknown, AppError> =>
   ResultAsync.fromPromise(response.json() as Promise<unknown>, (cause) =>
@@ -188,6 +313,8 @@ const pollJob = (
 export type RedashClient = {
   readonly testAuth: () => ResultAsync<void, AppError>;
   readonly listDataSources: () => ResultAsync<readonly DataSource[], AppError>;
+  readonly listDashboards: (input: DashboardListInput) => ResultAsync<DashboardList, AppError>;
+  readonly getDashboard: (slug: string) => ResultAsync<Dashboard, AppError>;
   readonly inviteUser: (input: InviteUserInput) => ResultAsync<InvitedUser, AppError>;
   readonly runQuery: (dataSourceId: number, sql: string) => ResultAsync<readonly Row[], AppError>;
 };
@@ -219,6 +346,16 @@ export const createRedashClient = ({
 
       return ok(parsed.data);
     });
+
+  const listDashboards = (input: DashboardListInput): ResultAsync<DashboardList, AppError> =>
+    buildDashboardListPath(input)
+      .asyncAndThen((path) => requestJson(baseUrl, apiKey, fetchImpl, path))
+      .andThen((json) => decodeDashboardList(json));
+
+  const getDashboard = (slug: string): ResultAsync<Dashboard, AppError> =>
+    buildDashboardPath(slug)
+      .asyncAndThen((path) => requestJson(baseUrl, apiKey, fetchImpl, path))
+      .andThen((json) => decodeDashboard(json));
 
   const inviteUser = (input: InviteUserInput): ResultAsync<InvitedUser, AppError> => {
     const path = input.sendEmail ? "/api/users" : "/api/users?no_invite";
@@ -289,6 +426,8 @@ export const createRedashClient = ({
   return {
     testAuth,
     listDataSources,
+    listDashboards,
+    getDashboard,
     inviteUser,
     runQuery,
   };
