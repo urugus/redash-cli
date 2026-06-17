@@ -1,5 +1,6 @@
 import { err, ok, type Result } from "neverthrow";
 import { type AppError, appError } from "../errors/app-error.js";
+import { nonEmptyTrimmed } from "../lib/result.js";
 
 export type QueryRunOptions = {
   readonly dataSourceId: string;
@@ -112,15 +113,8 @@ const validateSql = (sql: string): Result<string, AppError> => {
   return ok(sql);
 };
 
-const validateRequiredText = (value: string, field: string): Result<string, AppError> => {
-  const trimmed = value.trim();
-
-  if (trimmed.length === 0) {
-    return err(appError("validation_error", `${field} is required.`));
-  }
-
-  return ok(trimmed);
-};
+const validateRequiredText = (value: string, field: string): Result<string, AppError> =>
+  nonEmptyTrimmed(value, appError("validation_error", `${field} is required.`));
 
 const validateEmail = (email: string): Result<string, AppError> =>
   validateRequiredText(email, "Email").andThen((trimmed) => {
