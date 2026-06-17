@@ -1,6 +1,7 @@
 import { err, ok, Result, ResultAsync } from "neverthrow";
 import { z } from "zod";
 import { type AppError, appError } from "../errors/app-error.js";
+import { nonEmptyTrimmed } from "../lib/result.js";
 import type { Row } from "../output/format.js";
 
 export type FetchLike = (input: string, init?: RequestInit) => Promise<Response>;
@@ -216,13 +217,7 @@ const validateDashboardPageSize = (pageSize: number): Result<number, AppError> =
   );
 
 const validateDashboardRequiredText = (value: string, field: string): Result<string, AppError> =>
-  ok<string, AppError>(value.trim()).andThen((trimmed) =>
-    ensure(
-      trimmed,
-      (current) => current.length > 0,
-      appError("validation_error", `${field} is required.`),
-    ),
-  );
+  nonEmptyTrimmed(value, appError("validation_error", `${field} is required.`));
 
 const buildDashboardListQuery = ([page, pageSize, order]: [
   number,

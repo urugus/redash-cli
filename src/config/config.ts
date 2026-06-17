@@ -1,6 +1,7 @@
 import { err, ok, type Result } from "neverthrow";
 import { z } from "zod";
 import { type AppError, appError } from "../errors/app-error.js";
+import { parseJson } from "../lib/result.js";
 
 export type ProfileConfig = {
   readonly url: string;
@@ -53,13 +54,10 @@ export const parseConfigJson = (value: unknown): Result<CliConfig, AppError> => 
   return ok(parsed.data);
 };
 
-export const parseConfigText = (text: string): Result<CliConfig, AppError> => {
-  try {
-    return parseConfigJson(JSON.parse(text));
-  } catch (cause) {
-    return err(appError("config_invalid", "Config file is not valid JSON.", cause));
-  }
-};
+export const parseConfigText = (text: string): Result<CliConfig, AppError> =>
+  parseJson(text, (cause) =>
+    appError("config_invalid", "Config file is not valid JSON.", cause),
+  ).andThen((json) => parseConfigJson(json));
 
 export const serializeConfig = (config: CliConfig): string =>
   `${JSON.stringify(config, null, 2)}\n`;
