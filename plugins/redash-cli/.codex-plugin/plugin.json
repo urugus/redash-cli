@@ -1,0 +1,25 @@
+{
+  "name": "redash-cli",
+  "version": "0.2.1",
+  "description": "Codex workflows for developing, setting up, and using redash-cli.",
+  "author": {
+    "name": "urugus"
+  },
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "redash-cli",
+    "shortDescription": "Develop, set up, and use redash-cli with Codex.",
+    "longDescription": "Provides focused Codex skills for redash-cli development, first-time setup, and day-to-day CLI usage.",
+    "developerName": "urugus",
+    "category": "Developer Tools",
+    "capabilities": [
+      "Interactive",
+      "Write"
+    ],
+    "defaultPrompt": [
+      "Help me use redash-cli.",
+      "Set up redash-cli from source.",
+      "Work on the redash-cli repo."
+    ]
+  }
+}
