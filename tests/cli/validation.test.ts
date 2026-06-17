@@ -94,6 +94,7 @@ describe("CLI validation", () => {
     expect(validateDashboardListOptions({ pageSize: "0" }).isErr()).toBe(true);
     expect(validateDashboardListOptions({ pageSize: "251" }).isErr()).toBe(true);
     expect(validateDashboardListOptions({ page: "1e2" }).isErr()).toBe(true);
+    expect(validateDashboardListOptions({ page: "9007199254740992" }).isErr()).toBe(true);
   });
 
   it("rejects empty dashboard order", () => {

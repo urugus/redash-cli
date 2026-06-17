@@ -1,6 +1,5 @@
 export type AppErrorCode =
   | "config_invalid"
-  | "config_not_found"
   | "config_write_failed"
   | "keychain_failed"
   | "profile_not_found"

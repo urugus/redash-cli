@@ -34,6 +34,9 @@ describe("query explain helpers", () => {
     expect(expectOkValue(buildPostgresExplainSql('select "semi;colon" from t'))).toBe(
       'EXPLAIN (FORMAT JSON)\nselect "semi;colon" from t',
     );
+    expect(expectOkValue(buildPostgresExplainSql('select "semi"";colon" from t'))).toBe(
+      'EXPLAIN (FORMAT JSON)\nselect "semi"";colon" from t',
+    );
     expect(expectOkValue(buildPostgresExplainSql("select $$a;b$$ as value"))).toBe(
       "EXPLAIN (FORMAT JSON)\nselect $$a;b$$ as value",
     );
@@ -45,6 +48,12 @@ describe("query explain helpers", () => {
     );
     expect(expectOkValue(buildPostgresExplainSql("select /* ignored ; */ 1"))).toBe(
       "EXPLAIN (FORMAT JSON)\nselect /* ignored ; */ 1",
+    );
+    expect(expectOkValue(buildPostgresExplainSql("select $tag$a;b$tag$ as value"))).toBe(
+      "EXPLAIN (FORMAT JSON)\nselect $tag$a;b$tag$ as value",
+    );
+    expect(expectOkValue(buildPostgresExplainSql("select $$unterminated"))).toBe(
+      "EXPLAIN (FORMAT JSON)\nselect $$unterminated",
     );
   });
 
@@ -66,6 +75,7 @@ describe("query explain helpers", () => {
     expect(buildPostgresExplainSql("update users set name = 'a'").isErr()).toBe(true);
     expect(buildPostgresExplainSql("delete from users").isErr()).toBe(true);
     expect(buildPostgresExplainSql("drop table users").isErr()).toBe(true);
+    expect(buildPostgresExplainSql("/* unclosed comment").isErr()).toBe(true);
     expect(buildPostgresExplainSql("select 1; select 2").isErr()).toBe(true);
     expect(buildPostgresExplainSql("select 'a\\'; select 2").isErr()).toBe(true);
   });
@@ -145,6 +155,12 @@ describe("query explain helpers", () => {
   it("rejects invalid EXPLAIN rows", () => {
     expect(decodePostgresExplainRows([]).isErr()).toBe(true);
     expect(decodePostgresExplainRows([{ "QUERY PLAN": "not-json" }]).isErr()).toBe(true);
+    expect(decodePostgresExplainRows([{ "QUERY PLAN": [] }]).isErr()).toBe(true);
     expect(decodePostgresExplainRows([{ "QUERY PLAN": [{ nope: true }] }]).isErr()).toBe(true);
+    expect(decodePostgresExplainRows([{ "QUERY PLAN": null }]).isErr()).toBe(true);
+    expect(decodePostgresExplainRows([{ "QUERY PLAN": [{ Plan: [] }] }]).isErr()).toBe(true);
+    expect(
+      decodePostgresExplainRows([{ "QUERY PLAN": [{ Plan: { "Node Type": "Result" } }] }]).isErr(),
+    ).toBe(true);
   });
 });
