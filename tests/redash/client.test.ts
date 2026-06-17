@@ -173,6 +173,25 @@ describe("Redash client", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it("rejects non-integer dashboard list input before requesting Redash", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(jsonResponse({ results: [] }));
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+    });
+
+    const result = await client.listDashboards({
+      page: 1.5,
+      pageSize: 20,
+      order: "-created_at",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result.error.message).toBe("Page must be a positive integer.");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("rejects oversized dashboard page size before requesting Redash", async () => {
     const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(jsonResponse({ results: [] }));
     const client = createRedashClient({
@@ -380,6 +399,24 @@ describe("Redash client", () => {
     expect(result.error.message).toContain("may not have permission");
   });
 
+  it("rejects invalid user invitation responses", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(jsonResponse({ id: "10" }));
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+    });
+
+    const result = await client.inviteUser({
+      name: "Taro Yamada",
+      email: "taro@example.com",
+      sendEmail: true,
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result.error.message).toBe("Redash user invite response is invalid.");
+  });
+
   it("returns immediate query rows", async () => {
     const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(
       jsonResponse({
@@ -411,6 +448,28 @@ describe("Redash client", () => {
         }),
       }),
     );
+  });
+
+  it("rejects invalid immediate query row responses", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(
+      jsonResponse({
+        query_result: {
+          data: {
+            rows: "not rows",
+          },
+        },
+      }),
+    );
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+    });
+
+    const result = await client.runQuery(1, "select 1");
+
+    expect(result.isErr()).toBe(true);
+    expect(result.error.message).toBe("Redash query run response is invalid.");
   });
 
   it("polls query jobs and fetches rows", async () => {
@@ -495,6 +554,130 @@ describe("Redash client", () => {
     const result = await client.runQuery(1, "bad sql");
 
     expect(result.isErr()).toBe(true);
+    expect(result.error.message).toBe("syntax error");
+  });
+
+  it("returns a default error when a failed job has no message", async () => {
+    const fetchImpl = vi
+      .fn<FetchLike>()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          job: {
+            id: "job-1",
+            status: 1,
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          job: {
+            id: "job-1",
+            status: 4,
+          },
+        }),
+      );
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+      sleep: () => Promise.resolve(),
+    });
+
+    const result = await client.runQuery(1, "bad sql");
+
+    expect(result.isErr()).toBe(true);
+    expect(result.error.message).toBe("Redash query job failed.");
+  });
+
+  it("times out pending query jobs", async () => {
+    const fetchImpl = vi
+      .fn<FetchLike>()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          job: {
+            id: "job-1",
+            status: 1,
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          job: {
+            id: "job-1",
+            status: 1,
+          },
+        }),
+      );
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+      sleep: () => Promise.resolve(),
+      jobPollMaxAttempts: 1,
+    });
+
+    const result = await client.runQuery(1, "select count(*)");
+
+    expect(result.isErr()).toBe(true);
+    expect(result.error.message).toBe("Redash query job timed out: job-1");
+  });
+
+  it("wraps polling sleep failures", async () => {
+    const fetchImpl = vi
+      .fn<FetchLike>()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          job: {
+            id: "job-1",
+            status: 1,
+          },
+        }),
+      )
+      .mockResolvedValueOnce(
+        jsonResponse({
+          job: {
+            id: "job-1",
+            status: 1,
+          },
+        }),
+      );
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+      sleep: () => Promise.reject(new Error("sleep failed")),
+      jobPollMaxAttempts: 2,
+    });
+
+    const result = await client.runQuery(1, "select count(*)");
+
+    expect(result.isErr()).toBe(true);
+    expect(result.error.message).toBe("Redash query job polling sleep failed.");
+  });
+
+  it("rejects invalid job responses", async () => {
+    const fetchImpl = vi
+      .fn<FetchLike>()
+      .mockResolvedValueOnce(
+        jsonResponse({
+          job: {
+            id: "job-1",
+            status: 1,
+          },
+        }),
+      )
+      .mockResolvedValueOnce(jsonResponse({ job: { id: "job-1" } }));
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+      sleep: () => Promise.resolve(),
+    });
+
+    const result = await client.runQuery(1, "select count(*)");
+
+    expect(result.isErr()).toBe(true);
+    expect(result.error.message).toBe("Redash job response is invalid.");
   });
 
   it("returns an error for HTTP failures", async () => {
@@ -508,5 +691,68 @@ describe("Redash client", () => {
     const result = await client.testAuth();
 
     expect(result.isErr()).toBe(true);
+  });
+
+  it("wraps network failures", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockRejectedValue(new Error("network down"));
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+    });
+
+    const result = await client.testAuth();
+
+    expect(result.isErr()).toBe(true);
+    expect(result.error.message).toBe("Failed to request Redash: /api/session");
+  });
+
+  it("wraps invalid JSON responses", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(new Response("{", { status: 200 }));
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+    });
+
+    const result = await client.testAuth();
+
+    expect(result.isErr()).toBe(true);
+    expect(result.error.message).toBe("Failed to parse JSON for /api/session.");
+  });
+
+  it("rejects empty JSON responses", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(
+      new Response("null", {
+        status: 200,
+        headers: {
+          "Content-Type": "application/json",
+        },
+      }),
+    );
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+    });
+
+    const result = await client.testAuth();
+
+    expect(result.isErr()).toBe(true);
+    expect(result.error.message).toBe("Redash returned empty JSON for /api/session.");
+  });
+
+  it("rejects invalid data source responses", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(jsonResponse([{ id: "1" }]));
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+    });
+
+    const result = await client.listDataSources();
+
+    expect(result.isErr()).toBe(true);
+    expect(result.error.message).toBe("Redash data sources response is invalid.");
   });
 });
