@@ -38,6 +38,16 @@ describe("config", () => {
     });
   });
 
+  it("rejects invalid config JSON", () => {
+    const result = parseConfigText("{");
+
+    expect(result.isErr()).toBe(true);
+    if (result.isErr()) {
+      expect(result.error.code).toBe("config_invalid");
+      expect(result.error.message).toBe("Config file is not valid JSON.");
+    }
+  });
+
   it("resolves the default profile", () => {
     const config = upsertProfile(emptyConfig(), "ey", "https://redash.example.com");
     const result = resolveProfile(config);

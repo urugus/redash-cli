@@ -6,5 +6,8 @@ export const parseJson = <E>(
 ): ResultType<unknown, E> =>
   Result.fromThrowable((value: string): unknown => JSON.parse(value) as unknown, toError)(text);
 
-export const nonEmptyTrimmed = <E>(value: string, error: E): ResultType<string, E> =>
-  ok<string, E>(value.trim()).andThen((trimmed) => (trimmed.length > 0 ? ok(trimmed) : err(error)));
+export const nonEmptyTrimmed = <E>(value: string, error: E): ResultType<string, E> => {
+  const trimmed = value.trim();
+
+  return trimmed.length > 0 ? ok(trimmed) : err(error);
+};
