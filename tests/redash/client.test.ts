@@ -40,6 +40,236 @@ describe("Redash client", () => {
     );
   });
 
+  it("lists dashboards from a paginated envelope", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(
+      jsonResponse({
+        count: 1,
+        page: 1,
+        page_size: 20,
+        results: [
+          {
+            id: 10,
+            name: "Sales Overview",
+            slug: "sales-overview",
+            tags: ["sales"],
+          },
+        ],
+      }),
+    );
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+    });
+
+    const result = await client.listDashboards({
+      page: 1,
+      pageSize: 20,
+      order: "-created_at",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result.value).toEqual({
+      count: 1,
+      page: 1,
+      page_size: 20,
+      results: [
+        {
+          id: 10,
+          name: "Sales Overview",
+          slug: "sales-overview",
+          tags: ["sales"],
+        },
+      ],
+    });
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://redash.example.com/api/dashboards?page=1&page_size=20&order=-created_at",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Key key",
+        }),
+      }),
+    );
+  });
+
+  it("normalizes dashboard array responses", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(
+      jsonResponse([
+        {
+          id: 10,
+          name: "Sales Overview",
+          slug: "sales-overview",
+        },
+      ]),
+    );
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+    });
+
+    const result = await client.listDashboards({
+      page: 1,
+      pageSize: 20,
+      order: "-created_at",
+    });
+
+    expect(result.isOk()).toBe(true);
+    expect(result.value).toEqual({
+      results: [
+        {
+          id: 10,
+          name: "Sales Overview",
+          slug: "sales-overview",
+        },
+      ],
+    });
+  });
+
+  it("rejects unknown dashboard list response shapes", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(
+      jsonResponse({
+        dashboards: [
+          {
+            id: 10,
+            name: "Sales Overview",
+            slug: "sales-overview",
+          },
+        ],
+      }),
+    );
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+    });
+
+    const result = await client.listDashboards({
+      page: 1,
+      pageSize: 20,
+      order: "-created_at",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result.error.message).toBe("Redash dashboards response is invalid.");
+  });
+
+  it("rejects invalid dashboard list input before requesting Redash", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(jsonResponse({ results: [] }));
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+    });
+
+    const result = await client.listDashboards({
+      page: 0,
+      pageSize: 20,
+      order: "-created_at",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result.error.message).toBe("Page must be a positive integer.");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("rejects oversized dashboard page size before requesting Redash", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(jsonResponse({ results: [] }));
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+    });
+
+    const result = await client.listDashboards({
+      page: 1,
+      pageSize: 251,
+      order: "-created_at",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result.error.message).toBe("Page size must be less than or equal to 250.");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("rejects empty dashboard list order before requesting Redash", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(jsonResponse({ results: [] }));
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+    });
+
+    const result = await client.listDashboards({
+      page: 1,
+      pageSize: 20,
+      order: "   ",
+    });
+
+    expect(result.isErr()).toBe(true);
+    expect(result.error.message).toBe("Order is required.");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
+  it("gets a dashboard by encoded slug", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(
+      jsonResponse({
+        id: 10,
+        name: "Sales Overview",
+        slug: "sales overview",
+        widgets: [],
+      }),
+    );
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+    });
+
+    const result = await client.getDashboard("sales overview");
+
+    expect(result.isOk()).toBe(true);
+    expect(result.value).toEqual({
+      id: 10,
+      name: "Sales Overview",
+      slug: "sales overview",
+      widgets: [],
+    });
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://redash.example.com/api/dashboards/sales%20overview",
+      expect.anything(),
+    );
+  });
+
+  it("rejects unknown dashboard detail response shapes", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(jsonResponse({ widgets: [] }));
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+    });
+
+    const result = await client.getDashboard("sales-overview");
+
+    expect(result.isErr()).toBe(true);
+    expect(result.error.message).toBe("Redash dashboard response is invalid.");
+  });
+
+  it("rejects empty dashboard slugs before requesting Redash", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(jsonResponse({}));
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+    });
+
+    const result = await client.getDashboard("   ");
+
+    expect(result.isErr()).toBe(true);
+    expect(result.error.message).toBe("Dashboard slug is required.");
+    expect(fetchImpl).not.toHaveBeenCalled();
+  });
+
   it("invites a user and sends an email by default", async () => {
     const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(
       jsonResponse({

@@ -21,6 +21,17 @@ export type UserInviteOptions = {
   readonly profile?: string;
 };
 
+export type DashboardListOptions = {
+  readonly page?: string;
+  readonly pageSize?: string;
+  readonly order?: string;
+  readonly profile?: string;
+};
+
+export type DashboardGetOptions = {
+  readonly profile?: string;
+};
+
 export type ValidQueryRunOptions = {
   readonly dataSourceId: number;
   readonly sql: string;
@@ -41,6 +52,20 @@ export type ValidUserInviteOptions = {
   readonly profile?: string;
 };
 
+export type ValidDashboardListOptions = {
+  readonly page: number;
+  readonly pageSize: number;
+  readonly order: string;
+  readonly profile?: string;
+};
+
+export type ValidDashboardGetOptions = {
+  readonly slug: string;
+  readonly profile?: string;
+};
+
+const maxDashboardPageSize = 250;
+
 const validateDataSourceId = (value: string): Result<number, AppError> => {
   const dataSourceId = Number(value);
 
@@ -50,6 +75,34 @@ const validateDataSourceId = (value: string): Result<number, AppError> => {
 
   return ok(dataSourceId);
 };
+
+const validatePositiveInteger = (value: string, field: string): Result<number, AppError> => {
+  if (!/^[1-9]\d*$/.test(value)) {
+    return err(appError("validation_error", `${field} must be a positive integer.`));
+  }
+
+  const parsed = Number(value);
+
+  if (!Number.isSafeInteger(parsed)) {
+    return err(appError("validation_error", `${field} must be a positive integer.`));
+  }
+
+  return ok(parsed);
+};
+
+const validateDashboardPageSize = (value: string): Result<number, AppError> =>
+  validatePositiveInteger(value, "Page size").andThen((pageSize) => {
+    if (pageSize > maxDashboardPageSize) {
+      return err(
+        appError(
+          "validation_error",
+          `Page size must be less than or equal to ${maxDashboardPageSize}.`,
+        ),
+      );
+    }
+
+    return ok(pageSize);
+  });
 
 const validateSql = (sql: string): Result<string, AppError> => {
   if (sql.trim().length === 0) {
@@ -112,3 +165,26 @@ export const validateUserInviteOptions = (
       profile: options.profile,
     })),
   );
+
+export const validateDashboardListOptions = (
+  options: DashboardListOptions,
+): Result<ValidDashboardListOptions, AppError> =>
+  validatePositiveInteger(options.page ?? "1", "Page").andThen((page) =>
+    validateDashboardPageSize(options.pageSize ?? "20").andThen((pageSize) =>
+      validateRequiredText(options.order ?? "-created_at", "Order").map((order) => ({
+        page,
+        pageSize,
+        order,
+        profile: options.profile,
+      })),
+    ),
+  );
+
+export const validateDashboardGetOptions = (
+  slug: string,
+  options: DashboardGetOptions,
+): Result<ValidDashboardGetOptions, AppError> =>
+  validateRequiredText(slug, "Dashboard slug").map((validSlug) => ({
+    slug: validSlug,
+    profile: options.profile,
+  }));

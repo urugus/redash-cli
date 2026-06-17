@@ -20,9 +20,13 @@ import {
   findPostgresDataSource,
 } from "./explain.js";
 import {
+  type DashboardGetOptions,
+  type DashboardListOptions,
   type QueryExplainOptions,
   type QueryRunOptions,
   type UserInviteOptions,
+  validateDashboardGetOptions,
+  validateDashboardListOptions,
   validateQueryExplainOptions,
   validateQueryRunOptions,
   validateUserInviteOptions,
@@ -183,6 +187,52 @@ export const createProgram = ({
         buildClientForProfile(options.profile).andThen(({ client }) => client.listDataSources()),
         (sources) => {
           io.stdout.write(`${JSON.stringify(sources, null, 2)}\n`);
+        },
+      );
+    });
+
+  const dashboards = program.command("dashboards").description("Redash dashboard commands");
+
+  dashboards
+    .command("list")
+    .option("--profile <profile>", "Profile name")
+    .option("--page <page>", "Page number", "1")
+    .option("--page-size <size>", "Dashboards per page, up to 250", "20")
+    .option("--order <order>", "Sort order, for example --order=-created_at", "-created_at")
+    .description("List Redash dashboards")
+    .action(async (options: DashboardListOptions) => {
+      await runTask(
+        io,
+        validateDashboardListOptions(options).asyncAndThen((validOptions) =>
+          buildClientForProfile(validOptions.profile).andThen(({ client }) =>
+            client.listDashboards({
+              page: validOptions.page,
+              pageSize: validOptions.pageSize,
+              order: validOptions.order,
+            }),
+          ),
+        ),
+        (dashboardsResult) => {
+          io.stdout.write(`${JSON.stringify(dashboardsResult, null, 2)}\n`);
+        },
+      );
+    });
+
+  dashboards
+    .command("get")
+    .argument("<slug>", "Dashboard slug")
+    .option("--profile <profile>", "Profile name")
+    .description("Get a Redash dashboard by slug")
+    .action(async (slug: string, options: DashboardGetOptions) => {
+      await runTask(
+        io,
+        validateDashboardGetOptions(slug, options).asyncAndThen((validOptions) =>
+          buildClientForProfile(validOptions.profile).andThen(({ client }) =>
+            client.getDashboard(validOptions.slug),
+          ),
+        ),
+        (dashboard) => {
+          io.stdout.write(`${JSON.stringify(dashboard, null, 2)}\n`);
         },
       );
     });

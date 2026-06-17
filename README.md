@@ -81,6 +81,24 @@ List Redash data sources:
 redash data-sources list
 ```
 
+List Redash dashboards:
+
+```sh
+redash dashboards list
+```
+
+List Redash dashboards with explicit paging and sort order:
+
+```sh
+redash dashboards list --page 1 --page-size 20 --order=-created_at
+```
+
+Get a Redash dashboard by slug:
+
+```sh
+redash dashboards get sales-overview
+```
+
 Invite a Redash user:
 
 ```sh
@@ -171,6 +189,9 @@ The release workflow requires an `NPM_TOKEN` repository secret.
 
 - Supported output formats are `json` and `csv`.
 - User invitation requires an admin API key.
+- Dashboard listing uses Redash's `/api/dashboards` endpoint. When passing a descending order
+  value, use `--order=-created_at` so the shell and CLI parser do not treat it as another flag.
+- Dashboard slugs can change when a dashboard is renamed in Redash.
 - Query execution uses Redash's `/api/query_results` endpoint and polls asynchronous jobs until completion.
 - Query explain uses PostgreSQL `EXPLAIN (FORMAT JSON)` and does not execute `EXPLAIN ANALYZE`.
 - Redash URLs must start with `http://` or `https://`.
