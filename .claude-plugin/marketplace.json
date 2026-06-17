@@ -9,7 +9,7 @@
       "name": "redash-cli",
       "source": "./plugins/redash-cli",
       "description": "Claude Code workflows for developing, setting up, and using redash-cli.",
-      "version": "0.1.0",
+      "version": "0.2.1",
       "author": {
         "name": "urugus"
       },
