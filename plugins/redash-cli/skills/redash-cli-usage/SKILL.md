@@ -87,6 +87,14 @@ Warn that dashboard slugs can change when dashboards are renamed in Redash.
 
 ## Query Commands
 
+Before running user-provided SQL:
+
+- Treat broad scans, joins across large tables, missing date filters, missing `LIMIT`, `SELECT *`, and aggregation over unknown ranges as potentially heavy.
+- For potentially heavy queries on PostgreSQL data sources, preview the plan with `redash query explain` before suggesting `redash query run`.
+- If `query explain` is unavailable for the data source, ask the user to confirm the query cost risk before running it and suggest adding restrictive filters, a date range, and `LIMIT`.
+- Do not run queries that look like writes or DDL. The CLI usage workflow should prefer read-only `SELECT` or `WITH` queries.
+- When the user only wants help composing SQL, provide the SQL and the explain command first; do not jump straight to execution.
+
 Run SQL and return JSON:
 
 ```sh
@@ -110,6 +118,7 @@ Guidance:
 - Confirm the data source ID before composing query commands.
 - Use `--format csv` when the user wants spreadsheet-friendly output.
 - Keep SQL examples small and read-only unless the user explicitly asks for another query and understands the effect.
+- Prefer adding a narrow date range, selective predicates, and `LIMIT` to exploratory queries.
 - Be careful with shell quoting. Wrap SQL in double quotes for simple examples, and mention that complex SQL may be easier to paste from a file or shell-safe quoted string if needed.
 
 ## Query Plan Preview
@@ -126,6 +135,7 @@ Explain the constraints:
 - It runs `EXPLAIN (FORMAT JSON)` without `ANALYZE`.
 - It accepts only a single `SELECT` or `WITH` query.
 - It prints a JSON object with a small summary plus the raw plan.
+- Use it before executing potentially heavy PostgreSQL queries, especially when the SQL lacks selective filters or has unknown table sizes.
 
 ## User Invitations
 
