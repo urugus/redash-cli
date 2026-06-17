@@ -7,13 +7,27 @@ This tool manages local Redash profiles, stores API keys in macOS Keychain, and 
 ## Requirements
 
 - Node.js 20 or newer
-- pnpm 10.33.0 or newer
+- pnpm 10.33.0 or newer for local development
 - macOS Keychain access for storing Redash API keys
 - A Redash API key
 
 ## Installation
 
-Install dependencies and build the CLI:
+Install the published npm package globally:
+
+```sh
+npm install --global @urugus/redash-cli
+redash --help
+```
+
+Or install it globally with pnpm:
+
+```sh
+pnpm add --global @urugus/redash-cli
+redash --help
+```
+
+For local development, install dependencies and build the CLI:
 
 ```sh
 pnpm install
@@ -149,6 +163,75 @@ pnpm format
 ```
 
 Build output is written to `dist/`.
+
+## Agent Plugins
+
+This repository includes shareable plugins for Codex and Claude Code. Both plugins package the same
+redash-cli skills:
+
+- `redash-cli-dev`: repository development, tests, package metadata, and release preparation.
+- `redash-cli-setup`: first-time setup from source or from the published npm package.
+- `redash-cli-usage`: day-to-day use of the installed `redash` command.
+
+The skills live under:
+
+```text
+plugins/redash-cli/skills/
+```
+
+They are packaged as plugins instead of standalone project skills so other users can install only
+these redash-cli workflows from a marketplace.
+
+### Codex
+
+Codex uses:
+
+- Plugin manifest: `plugins/redash-cli/.codex-plugin/plugin.json`
+- Marketplace manifest: `.agents/plugins/marketplace.json`
+
+Install the marketplace and plugin:
+
+```sh
+codex plugin marketplace add urugus/redash-cli
+codex plugin add redash-cli@redash-cli
+```
+
+Start a new Codex thread after installing so Codex can discover the plugin skills.
+
+### Claude Code
+
+Claude Code uses:
+
+- Plugin manifest: `plugins/redash-cli/.claude-plugin/plugin.json`
+- Marketplace manifest: `.claude-plugin/marketplace.json`
+
+Install the marketplace and plugin:
+
+```sh
+claude plugin marketplace add urugus/redash-cli
+claude plugin install redash-cli@redash-cli
+```
+
+Plugin skills are namespaced in Claude Code:
+
+```text
+/redash-cli:redash-cli-usage
+/redash-cli:redash-cli-setup
+/redash-cli:redash-cli-dev
+```
+
+For local Claude Code plugin development, load the plugin directly:
+
+```sh
+claude --plugin-dir ./plugins/redash-cli
+```
+
+Validate the Claude Code marketplace and plugin:
+
+```sh
+claude plugin validate .
+claude plugin validate ./plugins/redash-cli --strict
+```
 
 ## Release
 

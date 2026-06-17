@@ -1,0 +1,24 @@
+{
+  "name": "redash-cli",
+  "owner": {
+    "name": "urugus"
+  },
+  "description": "Claude Code plugins for redash-cli workflows.",
+  "plugins": [
+    {
+      "name": "redash-cli",
+      "source": "./plugins/redash-cli",
+      "description": "Claude Code workflows for developing, setting up, and using redash-cli.",
+      "version": "0.1.0",
+      "author": {
+        "name": "urugus"
+      },
+      "category": "developer-tools",
+      "tags": [
+        "redash",
+        "cli",
+        "skills"
+      ]
+    }
+  ]
+}

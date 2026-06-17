@@ -1,0 +1,20 @@
+{
+  "name": "redash-cli",
+  "interface": {
+    "displayName": "redash-cli"
+  },
+  "plugins": [
+    {
+      "name": "redash-cli",
+      "source": {
+        "source": "local",
+        "path": "./plugins/redash-cli"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}

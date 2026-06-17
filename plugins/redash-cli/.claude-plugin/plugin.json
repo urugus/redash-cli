@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-plugin-manifest.json",
+  "name": "redash-cli",
+  "displayName": "redash-cli",
+  "version": "0.1.0",
+  "description": "Claude Code workflows for developing, setting up, and using redash-cli.",
+  "author": {
+    "name": "urugus"
+  },
+  "repository": "https://github.com/urugus/redash-cli",
+  "keywords": [
+    "redash",
+    "cli",
+    "skills"
+  ],
+  "skills": "./skills/"
+}
