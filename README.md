@@ -125,6 +125,14 @@ Create a pending invitation without sending email:
 redash users invite --name "Taro Yamada" --email taro@example.com --no-send-email
 ```
 
+Show Redash query queue and worker status:
+
+```sh
+redash admin queue-status
+```
+
+Admin commands require a super admin API key.
+
 Run SQL and print JSON:
 
 ```sh

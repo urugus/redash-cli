@@ -311,6 +311,94 @@ describe("Redash client", () => {
     expect(fetchImpl).not.toHaveBeenCalled();
   });
 
+  it("gets admin queue status", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(
+      jsonResponse({
+        queues: {
+          queries: {
+            name: "queries",
+            queued: 2,
+            started: [{ id: "job-1" }],
+            scheduled_jobs: 5,
+          },
+        },
+        workers: [
+          {
+            name: "worker-1",
+            state: "busy",
+            current_job: "job-1",
+            queues: "queries",
+            successful_jobs: 10,
+          },
+        ],
+      }),
+    );
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+    });
+
+    const result = await client.getAdminQueueStatus();
+
+    expect(result.isOk()).toBe(true);
+    expect(result.value).toEqual({
+      queues: {
+        queries: {
+          name: "queries",
+          queued: 2,
+          started: [{ id: "job-1" }],
+          scheduled_jobs: 5,
+        },
+      },
+      workers: [
+        {
+          name: "worker-1",
+          state: "busy",
+          current_job: "job-1",
+          queues: "queries",
+          successful_jobs: 10,
+        },
+      ],
+    });
+    expect(fetchImpl).toHaveBeenCalledWith(
+      "https://redash.example.com/api/admin/queries/rq_status",
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: "Key key",
+        }),
+      }),
+    );
+  });
+
+  it("rejects invalid admin queue status responses", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(jsonResponse({ queues: [] }));
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+    });
+
+    const result = await client.getAdminQueueStatus();
+
+    expect(result.isErr()).toBe(true);
+    expect(result.error.message).toBe("Redash admin queue status response is invalid.");
+  });
+
+  it("returns a permission error when admin queue status is forbidden", async () => {
+    const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(jsonResponse({ message: "no" }, 403));
+    const client = createRedashClient({
+      baseUrl: "https://redash.example.com",
+      apiKey: "key",
+      fetchImpl,
+    });
+
+    const result = await client.getAdminQueueStatus();
+
+    expect(result.isErr()).toBe(true);
+    expect(result.error.message).toContain("may not have permission");
+  });
+
   it("invites a user and sends an email by default", async () => {
     const fetchImpl = vi.fn<FetchLike>().mockResolvedValue(
       jsonResponse({
