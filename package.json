@@ -1,6 +1,6 @@
 {
   "name": "@urugus/redash-cli",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "description": "A small command-line client for Redash.",
   "type": "module",
   "bin": {
