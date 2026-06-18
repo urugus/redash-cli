@@ -1,6 +1,6 @@
 ---
 name: redash-cli-usage
-description: Help someone use the installed redash CLI. Use this for configuring profiles, checking authentication, listing data sources or dashboards, inviting users, running SQL, exporting JSON or CSV, explaining PostgreSQL query plans, and choosing safe command examples.
+description: Help someone use the installed redash CLI. Use this for configuring profiles, checking authentication, listing data sources or dashboards, checking admin query queue status, inviting users, running SQL, exporting JSON or CSV, explaining PostgreSQL query plans, and choosing safe command examples.
 ---
 
 # redash-cli Usage
@@ -84,6 +84,27 @@ redash dashboards get sales-overview
 ```
 
 Warn that dashboard slugs can change when dashboards are renamed in Redash.
+
+## Admin Commands
+
+Show Redash query queue and worker status:
+
+```sh
+redash admin queue-status
+```
+
+Use a non-default profile:
+
+```sh
+redash admin queue-status --profile staging
+```
+
+Guidance:
+
+- `admin queue-status` fetches the Redash admin query queue status and prints JSON.
+- It requires a super admin API key.
+- Use it when the user wants the CLI equivalent of the Redash admin query tasks page.
+- If it returns HTTP 403, check whether the selected profile uses a super admin API key.
 
 ## Query Commands
 

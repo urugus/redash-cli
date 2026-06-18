@@ -4,6 +4,12 @@
 
 - Think in English and reply to the user in Japanese, unless the user explicitly asks for another language.
 
+## CLI Command Changes
+
+- When adding or changing CLI commands, update the relevant documentation and agent skills in the same change.
+  - Keep `README.md` command examples aligned with the actual CLI behavior.
+  - Update the relevant files under `plugins/redash-cli/skills/`, especially `redash-cli-usage`, when user-facing command usage changes.
+
 ## Release Management
 
 - Keep `package.json` version, Git release tag, and npm package version aligned one-to-one.
