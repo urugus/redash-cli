@@ -264,6 +264,24 @@ export const createProgram = ({
       );
     });
 
+  const admin = program.command("admin").description("Redash admin commands");
+
+  admin
+    .command("queue-status")
+    .option("--profile <profile>", "Profile name")
+    .description("Show Redash query queue and worker status")
+    .action(async (options: { readonly profile?: string }) => {
+      await runTask(
+        io,
+        buildClientForProfile(options.profile).andThen(({ client }) =>
+          client.getAdminQueueStatus(),
+        ),
+        (status) => {
+          io.stdout.write(`${JSON.stringify(status, null, 2)}\n`);
+        },
+      );
+    });
+
   const query = program.command("query").description("Redash query commands");
 
   query

@@ -92,6 +92,32 @@ const dashboardListEnvelopeSchema = z
 
 export type DashboardList = z.infer<typeof dashboardListEnvelopeSchema>;
 
+const adminQueueSchema = z
+  .object({
+    name: z.string().optional(),
+    queued: z.number().optional(),
+    started: z.array(z.unknown()).optional(),
+  })
+  .passthrough();
+
+const adminWorkerSchema = z
+  .object({
+    name: z.string().optional(),
+    state: z.string().optional(),
+    current_job: z.string().nullable().optional(),
+    queues: z.union([z.string(), z.array(z.string())]).optional(),
+  })
+  .passthrough();
+
+const adminQueueStatusSchema = z
+  .object({
+    queues: z.record(z.string(), adminQueueSchema),
+    workers: z.array(adminWorkerSchema),
+  })
+  .passthrough();
+
+export type AdminQueueStatus = z.infer<typeof adminQueueStatusSchema>;
+
 const queryResultEnvelopeSchema = z.object({
   query_result: z.object({
     data: z.object({
@@ -210,6 +236,9 @@ const decodeDashboard = (value: unknown): Result<Dashboard, AppError> =>
   parseSchema(dashboardSchema, value, "Redash dashboard response is invalid.").map((dashboard) =>
     redactSensitiveFields(dashboard),
   );
+
+const decodeAdminQueueStatus = (value: unknown): Result<AdminQueueStatus, AppError> =>
+  parseSchema(adminQueueStatusSchema, value, "Redash admin queue status response is invalid.");
 
 const decodeInvitedUser = (value: unknown): Result<InvitedUser, AppError> =>
   parseSchema(invitedUserSchema, value, "Redash user invite response is invalid.");
@@ -360,6 +389,7 @@ export type RedashClient = {
   readonly listDataSources: () => ResultAsync<readonly DataSource[], AppError>;
   readonly listDashboards: (input: DashboardListInput) => ResultAsync<DashboardList, AppError>;
   readonly getDashboard: (slug: string) => ResultAsync<Dashboard, AppError>;
+  readonly getAdminQueueStatus: () => ResultAsync<AdminQueueStatus, AppError>;
   readonly inviteUser: (input: InviteUserInput) => ResultAsync<InvitedUser, AppError>;
   readonly runQuery: (dataSourceId: number, sql: string) => ResultAsync<readonly Row[], AppError>;
 };
@@ -389,6 +419,11 @@ export const createRedashClient = ({
     buildDashboardPath(slug)
       .asyncAndThen((path) => requestJson(baseUrl, apiKey, fetchImpl, path))
       .andThen((json) => decodeDashboard(json));
+
+  const getAdminQueueStatus = (): ResultAsync<AdminQueueStatus, AppError> =>
+    requestJson(baseUrl, apiKey, fetchImpl, "/api/admin/queries/rq_status").andThen((json) =>
+      decodeAdminQueueStatus(json),
+    );
 
   const inviteUser = (input: InviteUserInput): ResultAsync<InvitedUser, AppError> => {
     const path = input.sendEmail ? "/api/users" : "/api/users?no_invite";
@@ -437,6 +472,7 @@ export const createRedashClient = ({
     listDataSources,
     listDashboards,
     getDashboard,
+    getAdminQueueStatus,
     inviteUser,
     runQuery,
   };
